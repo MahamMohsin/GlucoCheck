@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlucoCheck — Diabetes Risk Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0A0E14;
+    --surface:  #111820;
+    --card:     #161E28;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.12);
+    --green:    #00D48A;
+    --green-dim:#00D48A22;
+    --red:      #FF5F5F;
+    --red-dim:  #FF5F5F22;
+    --amber:    #FFC462;
+    --text:     #E8EDF2;
+    --muted:    #6B7A8D;
+    --mono:     'DM Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ── layout ── */
+  .shell {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── topbar ── */
+  header {
+    grid-column: 1 / -1;
+    padding: 0 36px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(.8); }
+  }
+
+  .header-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 3px 10px;
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+  }
+
+  /* ── sidebar (form) ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    overflow-y: auto;
+  }
+
+  .sidebar-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .field {
+    margin-bottom: 18px;
+  }
+
+  .field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 7px;
+  }
+
+  .field-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .field-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .field-unit {
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+
+  input[type=range] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--green);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform .15s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+  }
+
+  .field-bounds {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  .predict-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--green);
+    color: #0A0E14;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity .2s, transform .15s;
+  }
+
+  .predict-btn:hover  { opacity: .88; }
+  .predict-btn:active { transform: scale(.98); }
+
+  .predict-btn.loading {
+    opacity: .6;
+    pointer-events: none;
+  }
+
+  /* ── main panel ── */
+  .main {
+    padding: 32px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  /* empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+    min-height: 60vh;
+  }
+
+  .empty-icon {
+    width: 56px; height: 56px;
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  /* result sections */
+  .result-section { display: none; }
+  .result-section.visible { display: block; }
+
+  /* verdict banner */
+  .verdict {
+    border-radius: 12px;
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .verdict.diabetic {
+    background: var(--red-dim);
+    border: 1px solid rgba(255,95,95,0.2);
+  }
+
+  .verdict.healthy {
+    background: var(--green-dim);
+    border: 1px solid rgba(0,212,138,0.2);
+  }
+
+  .verdict-pct {
+    font-family: var(--mono);
+    font-size: 48px;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .verdict.diabetic .verdict-pct { color: var(--red); }
+  .verdict.healthy  .verdict-pct { color: var(--green); }
+
+  .verdict-info { flex: 1; }
+
+  .verdict-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .verdict-text {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .verdict.diabetic .verdict-text { color: var(--red); }
+  .verdict.healthy  .verdict-text { color: var(--green); }
+
+  .verdict-note {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* risk bar */
+  .risk-track {
+    height: 6px;
+    background: var(--border2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+
+  .risk-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .7s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* 2-col model cards */
+  .model-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .model-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .model-card-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .model-card-verdict {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .model-card-prob {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .model-bar {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+
+  .model-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+
+  /* factors */
+  .factors-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+
+  .factors-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .factor-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .factor-name {
+    font-size: 12px;
+    color: var(--muted);
+    width: 190px;
+    flex-shrink: 0;
+    font-family: var(--mono);
+  }
+
+  .factor-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .factor-fill {
+    height: 100%;
+    background: var(--amber);
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+
+  .factor-score {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 36px;
+    text-align: right;
+  }
+
+  /* disclaimer */
+  .disclaimer {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    line-height: 1.7;
+  }
+
+  /* section label */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  @media (max-width: 800px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .main { padding: 20px 18px; }
+    header { padding: 0 18px; }
+    .model-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      GlucoCheck
+    </div>
+    <div class="header-tag">Pima Indians Diabetes Dataset · LR + RF Ensemble</div>
+  </header>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Patient parameters</div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Pregnancies</span>
+        <span class="field-value" id="v0">3<span class="field-unit"> count</span></span>
+      </div>
+      <input type="range" id="f0" min="0" max="17" step="1" value="3" oninput="upd(0,this.value,0,'count')">
+      <div class="field-bounds"><span>0</span><span>17</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Glucose</span>
+        <span class="field-value" id="v1">110<span class="field-unit"> mg/dL</span></span>
+      </div>
+      <input type="range" id="f1" min="44" max="199" step="1" value="110" oninput="upd(1,this.value,0,'mg/dL')">
+      <div class="field-bounds"><span>44</span><span>199</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Blood Pressure</span>
+        <span class="field-value" id="v2">70<span class="field-unit"> mmHg</span></span>
+      </div>
+      <input type="range" id="f2" min="24" max="122" step="1" value="70" oninput="upd(2,this.value,0,'mmHg')">
+      <div class="field-bounds"><span>24</span><span>122</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Skin Thickness</span>
+        <span class="field-value" id="v3">23<span class="field-unit"> mm</span></span>
+      </div>
+      <input type="range" id="f3" min="7" max="99" step="1" value="23" oninput="upd(3,this.value,0,'mm')">
+      <div class="field-bounds"><span>7</span><span>99</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Insulin</span>
+        <span class="field-value" id="v4">80<span class="field-unit"> µU/mL</span></span>
+      </div>
+      <input type="range" id="f4" min="14" max="846" step="1" value="80" oninput="upd(4,this.value,0,'µU/mL')">
+      <div class="field-bounds"><span>14</span><span>846</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">BMI</span>
+        <span class="field-value" id="v5">28.0<span class="field-unit"> kg/m²</span></span>
+      </div>
+      <input type="range" id="f5" min="18" max="67" step="0.1" value="28" oninput="upd(5,this.value,1,'kg/m²')">
+      <div class="field-bounds"><span>18</span><span>67</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Diabetes Pedigree Fn</span>
+        <span class="field-value" id="v6">0.45<span class="field-unit"> score</span></span>
+      </div>
+      <input type="range" id="f6" min="0.08" max="2.42" step="0.01" value="0.45" oninput="upd(6,this.value,2,'score')">
+      <div class="field-bounds"><span>0.08</span><span>2.42</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <span class="field-label">Age</span>
+        <span class="field-value" id="v7">33<span class="field-unit"> yrs</span></span>
+      </div>
+      <input type="range" id="f7" min="21" max="81" step="1" value="33" oninput="upd(7,this.value,0,'yrs')">
+      <div class="field-bounds"><span>21</span><span>81</span></div>
+    </div>
+
+    <button class="predict-btn" id="predictBtn" onclick="runPrediction()">
+      Run prediction
+    </button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">⬡</div>
+      <div>Set patient parameters<br>and click <strong>Run prediction</strong></div>
+    </div>
+
+    <!-- results -->
+    <div class="result-section" id="resultSection">
+
+      <!-- verdict banner -->
+      <div class="verdict" id="verdictBanner">
+        <div>
+          <div class="verdict-pct" id="verdictPct">—</div>
+          <div class="verdict-label">ensemble risk</div>
+        </div>
+        <div class="verdict-info">
+          <div class="verdict-label">prediction</div>
+          <div class="verdict-text" id="verdictText">—</div>
+          <div class="verdict-note" id="verdictNote">—</div>
+        </div>
+        <div style="width:100px">
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:6px;">risk level</div>
+          <div class="risk-track">
+            <div class="risk-fill" id="riskFill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- model cards -->
+      <div>
+        <div class="section-label" style="margin-top:20px;">individual model results</div>
+        <div class="model-grid">
+          <div class="model-card">
+            <div class="model-card-name">Logistic Regression</div>
+            <div class="model-card-verdict" id="lrVerdict">—</div>
+            <div class="model-card-prob" id="lrProb">—</div>
+            <div class="model-bar"><div class="model-bar-fill" id="lrBar" style="width:0%"></div></div>
+          </div>
+          <div class="model-card">
+            <div class="model-card-name">Random Forest</div>
+            <div class="model-card-verdict" id="rfVerdict">—</div>
+            <div class="model-card-prob" id="rfProb">—</div>
+            <div class="model-bar"><div class="model-bar-fill" id="rfBar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- top factors -->
+      <div class="factors-card">
+        <div class="factors-title">top contributing features</div>
+        <div id="factorsContainer"></div>
+      </div>
+
+      <!-- disclaimer -->
+      <div class="disclaimer">
+        ⚠ GlucoCheck uses an ML ensemble (Logistic Regression + Random Forest) trained on the Pima Indians Diabetes Dataset.
+        This tool is for educational and research purposes only and does not constitute medical advice.
+        Always consult a qualified healthcare professional for diagnosis and treatment.
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+  const decimals = [0,0,0,0,0,1,2,0];
+  const units    = ['count','mg/dL','mmHg','mm','µU/mL','kg/m²','score','yrs'];
+  const keys     = ['Pregnancies','Glucose','BloodPressure','SkinThickness',
+                    'Insulin','BMI','DiabetesPedigreeFunction','Age'];
+
+  function upd(i, v, dec, unit) {
+    document.getElementById('v'+i).innerHTML =
+      parseFloat(v).toFixed(dec) + '<span class="field-unit"> ' + unit + '</span>';
+  }
+
+  async function runPrediction() {
+    const btn = document.getElementById('predictBtn');
+    btn.textContent = 'Predicting...';
+    btn.classList.add('loading');
+
+    const payload = {};
+    keys.forEach((k,i) => {
+      payload[k] = parseFloat(document.getElementById('f'+i).value);
+    });
+
+    try {
+      const res  = await fetch('/predict', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (data.error) { alert('Error: ' + data.error); return; }
+
+      const isDiab = data.final === 1;
+      const color  = isDiab ? 'var(--red)' : 'var(--green)';
+
+      // banner
+      const banner = document.getElementById('verdictBanner');
+      banner.className = 'verdict ' + (isDiab ? 'diabetic' : 'healthy');
+      document.getElementById('verdictPct').textContent  = data.avg_prob + '%';
+      document.getElementById('verdictText').textContent = isDiab ? 'Diabetic — high risk' : 'Non-Diabetic — low risk';
+      document.getElementById('verdictNote').textContent = isDiab
+        ? 'Recommend clinical evaluation and follow-up.'
+        : 'Continue routine monitoring and healthy lifestyle.';
+
+      // risk bar
+      document.getElementById('riskFill').style.width      = data.avg_prob + '%';
+      document.getElementById('riskFill').style.background = isDiab ? 'var(--red)' : 'var(--green)';
+
+      // model cards
+      const lrC = data.lr_pred === 1 ? 'var(--red)' : 'var(--green)';
+      const rfC = data.rf_pred === 1 ? 'var(--red)' : 'var(--green)';
+
+      document.getElementById('lrVerdict').textContent        = data.lr_pred ? 'Diabetic' : 'Non-Diabetic';
+      document.getElementById('lrVerdict').style.color        = lrC;
+      document.getElementById('lrProb').textContent           = data.lr_prob + '% probability';
+      document.getElementById('lrBar').style.width            = data.lr_prob + '%';
+      document.getElementById('lrBar').style.background       = lrC;
+
+      document.getElementById('rfVerdict').textContent        = data.rf_pred ? 'Diabetic' : 'Non-Diabetic';
+      document.getElementById('rfVerdict').style.color        = rfC;
+      document.getElementById('rfProb').textContent           = data.rf_prob + '% probability';
+      document.getElementById('rfBar').style.width            = data.rf_prob + '%';
+      document.getElementById('rfBar').style.background       = rfC;
+
+      // factors
+      const maxScore = Math.max(...data.top_factors.map(f => f.score));
+      document.getElementById('factorsContainer').innerHTML = data.top_factors.map(f => `
+        <div class="factor-row">
+          <div class="factor-name">${f.name}</div>
+          <div class="factor-track">
+            <div class="factor-fill" style="width:${maxScore>0?(f.score/maxScore*100).toFixed(1):0}%"></div>
+          </div>
+          <div class="factor-score">${f.score.toFixed(1)}</div>
+        </div>
+      `).join('');
+
+      document.getElementById('emptyState').style.display   = 'none';
+      document.getElementById('resultSection').classList.add('visible');
+
+    } catch(e) {
+      alert('Could not reach server. Is app.py running?');
+    } finally {
+      btn.textContent = 'Run prediction';
+      btn.classList.remove('loading');
+    }
+  }
+</script>
+</body>
+</html>
